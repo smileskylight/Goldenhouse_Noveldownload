@@ -18,7 +18,7 @@ git colne https://github.com/smileskylight/Goldenhouse_Nevildownload.git
 ### 使用
 - 本程式暫不提供python argparse 請直接在CMD中執行檔案
 ```bash
-python Nevil_goldenhouse_0.3.4.py
+python Novel_goldenhouse_0.3.4.py
 ```
 
 ### 指令
