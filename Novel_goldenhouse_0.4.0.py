@@ -14,6 +14,7 @@ def download():
         "bs4",
         "fake_useragent",
         "lxml",
+        "ffmpeg"
         # 添加其他套件的名稱
     ]
 
@@ -121,6 +122,10 @@ def sutch():
         nd()
         print()
         sutch()
+    elif enter == "ndv":  # 全本下載影片專用
+        nd()
+        print()
+        sutch()
     elif enter == "nsd":  # 全本下載有聲書
         nsd()
         print()
@@ -142,6 +147,7 @@ def help():
         "ntnu:小說章節連結\n",
         "nva:小說全本觀看\n",
         "nd:全本下載\n",
+        "ndv:全本下載製作有聲書專用\n",
         "nsd:全本下載有聲書(待開發)\n",
         "colse:關閉程式",
     )
@@ -154,11 +160,11 @@ def nl():
     # 使用假UA
     ua = UserAgent()
     my_header = {"user-agent": ua.random}
-    nevil_list_pages = range(1, 1412)
+    novel_list_pages = range(1, 1412)
 
     # 疊代每個頁面
-    for nevil_list_page in nevil_list_pages:
-        url = f"https://tw.hjwzw.com/List/all__{nevil_list_page}"
+    for novel_list_page in novel_list_pages:
+        url = f"https://tw.hjwzw.com/List/all__{novel_list_page}"
 
         # get方法 加上 假UA 取得 html
         ans = rq.get(url, headers=my_header)
@@ -171,11 +177,11 @@ def nl():
 
         # 抓標題
         title = root.find_all("span", class_="wd10")
-        nevil_list = []
+        novel_list = []
         for span in title:
             a_tag = span.find("a")
             if a_tag:
-                nevil_list.append(a_tag.text)
+                novel_list.append(a_tag.text)
 
         # 抓網址
 
@@ -185,7 +191,7 @@ def nl():
         href = [re.search(r"/Book/(\d+)", href).group(1) for href in href_attributes]
         formatted_data = [
             f"書籍名稱: {title.ljust(20)}\n書籍編號: {number}\n"
-            for title, number in zip(nevil_list, href)
+            for title, number in zip(novel_list, href)
         ]
 
         # 印出結果
@@ -199,8 +205,8 @@ def nl():
 # 讀取小說資料
 def nl_read():
     with open("小說編號列表.txt", "r", encoding="utf-8") as file:
-        nevil_read = file.read()
-        print(nevil_read)
+        novel_read = file.read()
+        print(novel_read)
 
 
 # 查詢小說編號
@@ -209,12 +215,12 @@ import re
 
 def nh():
     with open("小說編號列表.txt", "r", encoding="utf-8") as file:
-        nevil_read = file.read()
+        novel_read = file.read()
         bookname = input(" 請輸入書籍名稱: ")
 
         # 修改正則表達式，使用圓括號捕獲書名和編號
         matches = re.findall(
-            f"書籍名稱: ({bookname}.*?)書籍編號: (\\d+)", nevil_read, re.DOTALL
+            f"書籍名稱: ({bookname}.*?)書籍編號: (\\d+)", novel_read, re.DOTALL
         )
 
         if matches:
@@ -229,11 +235,11 @@ def nh():
 
 # nt:小說目錄
 def nt():
-    nevil_numbers = input(" 請輸入小說編號 : ")
+    novel_numbers = input(" 請輸入小說編號 : ")
     # 使用假UA
     ua = UserAgent()
     my_header = {"user-agent": ua.random}
-    url = f"https://tw.hjwzw.com/Book/Chapter/{nevil_numbers}"
+    url = f"https://tw.hjwzw.com/Book/Chapter/{novel_numbers}"
 
     # get方法 加上 假UA 取得 html
     ans = rq.get(url, headers=my_header)
@@ -250,11 +256,11 @@ def nt():
 
 # ntnu:小說章節連結
 def ntnu():
-    nevil_numbers = input(" 請輸入小說編號 : ")
+    novel_numbers = input(" 請輸入小說編號 : ")
     # 使用假UA
     ua = UserAgent()
     my_header = {"user-agent": ua.random}
-    url = f"https://tw.hjwzw.com/Book/Chapter/{nevil_numbers}"
+    url = f"https://tw.hjwzw.com/Book/Chapter/{novel_numbers}"
 
     # get方法 加上 假UA 取得 html
     ans = rq.get(url, headers=my_header)
@@ -275,12 +281,12 @@ def ntnu():
 
 # nva:小說全本觀看
 def nva():
-    nevil_numbers = input(" 請輸入小說編號 : ")
+    novel_numbers = input(" 請輸入小說編號 : ")
     # 使用假 ua
     ua = UserAgent()
     my_header = {"user-agent": ua.random}
     # get方法 加上 假UA 取得 html
-    url = f"https://tw.hjwzw.com/Book/Chapter/{nevil_numbers}"
+    url = f"https://tw.hjwzw.com/Book/Chapter/{novel_numbers}"
     ans = rq.get(url, headers=my_header)
 
     root = bs(ans.text, "lxml")
@@ -301,14 +307,14 @@ def nva():
         print(title)
 
         # 抓內容
-        nevil = root.find_all(
+        novel = root.find_all(
             "div",
             style="font-size: 20px; line-height: 30px; word-wrap: break-word; table-layout: fixed; word-break: break-all; width: 750px; margin: 0 auto; text-indent: 2em;",
         )
 
         pattern = re.compile(r"[\d\u4e00-\u9fff，,。?!“”]+")
 
-        for tag in nevil:
+        for tag in novel:
             text = tag.get_text()  # 提取標籤中的文本
             matches = pattern.findall(text)
             print(type(matches))
@@ -319,17 +325,18 @@ def nva():
 
 # nd:全本下載
 def nd():
-    nevil_numbers = input(" 請輸入小說編號 : ")
+    words_to_delete = ["請記住本站域名", "黃金屋"]
+    novel_numbers = input(" 請輸入小說編號 : ")
     # 使用假 ua
     ua = UserAgent()
     my_header = {"user-agent": ua.random}
-    url = f"https://tw.hjwzw.com/Book/Chapter/{nevil_numbers}"
+    url = f"https://tw.hjwzw.com/Book/Chapter/{novel_numbers}"
     # get方法 加上 假UA 取得 html
     ans = rq.get(url, headers=my_header)
 
     root = bs(ans.text, "lxml")
     # 抓小說名
-    nevil_name = root.find("h1").string
+    novel_name = root.find("h1").string
 
     # 抓標題
     pattern = re.compile(r"/Book/Read/(\d+),(\d+)")
@@ -338,7 +345,7 @@ def nd():
     hrefs = ["https://tw.hjwzw.com" + tag["href"] for tag in title]
 
     # 打開檔案以寫入模式
-    with open(f"{nevil_name}.txt", "w", encoding="utf-8") as output_file:
+    with open(f"{novel_name}.txt", "w", encoding="utf-8") as output_file:
         for href in hrefs:
 
             # 使用假 ua 和 get 方法抓取網站並印出 text
@@ -348,26 +355,92 @@ def nd():
             # 抓標題
             title = root.find("h1").string
             output_file.write(f"{title}\n")
-            print(f"{title}下載成功")
+            # print(f"{title}下載成功")
+            if title and title.string:
+                chapter_title = title.string.strip()
+                # 将章节标题添加到需要删除的词列表中
+                dynamic_words_to_delete = words_to_delete + [chapter_title,novel_name]
+                print(f"{chapter_title} 下載成功")
 
-            # 抓內容
-            nevil = root.find_all(
-                "div",
-                style="font-size: 20px; line-height: 30px; word-wrap: break-word; table-layout: fixed; word-break: break-all; width: 750px; margin: 0 auto; text-indent: 2em;",
-            )
+                # 抓內容
+                content_divs = root.find_all(
+                    "div",
+                    style="font-size: 20px; line-height: 30px; word-wrap: break-word; table-layout: fixed; word-break: break-all; width: 750px; margin: 0 auto; text-indent: 2em;",
+                )
 
-            pattern = re.compile(r"[\d\u4e00-\u9fff…，,。?!“”]+")
+                for tag in content_divs:
+                    text = tag.get_text()  # 提取標籤中的文本
 
-            for tag in nevil:
-                text = tag.get_text()  # 提取標籤中的文本
-                matches = pattern.findall(text)
+                    # 刪除匹配 dynamic_words_to_delete 的詞
+                    for word in dynamic_words_to_delete:
+                        text = text.replace(word, "")
 
-                for match in matches:
-                    output_file.write(f"{match}\n")
-                output_file.write("\n")  # 每章節之間空一行
-            sleep(0.2)
-            output_file.write("=" * 30 + "\n")  # 每章小說之間用等號分隔
+                    pattern = re.compile(r"[\d\u4e00-\u9fff…，,。?!、！《》“”？：]+")
+                    matches = pattern.findall(text)
+                    for match in matches:
+                        output_file.write(f"{match}\n")
+                    output_file.write("\n")  # 每章節之間空一行
 
+                sleep(0.2)
+                output_file.write("=" * 30 + "\n")  # 每章小說之間用等號分隔
+
+# ndv:全本下載做影片用
+def ndv():
+    words_to_delete = ["請記住本站域名", "黃金屋"]
+    novel_numbers = input(" 請輸入小說編號 : ")
+    # 使用假 ua
+    ua = UserAgent()
+    my_header = {"user-agent": ua.random}
+    url = f"https://tw.hjwzw.com/Book/Chapter/{novel_numbers}"
+    # get方法 加上 假UA 取得 html
+    ans = rq.get(url, headers=my_header)
+
+    root = bs(ans.text, "lxml")
+    # 抓小說名
+    novel_name = root.find("h1").string
+
+    # 抓標題
+    pattern = re.compile(r"/Book/Read/(\d+),(\d+)")
+    title = root.find_all("a", href=pattern)
+    # 抓網址
+    hrefs = ["https://tw.hjwzw.com" + tag["href"] for tag in title]
+
+    # 打開檔案以寫入模式
+    with open(f"{novel_name}vidio.txt", "w", encoding="utf-8") as output_file:
+        for href in hrefs:
+            # 使用假 ua 和 get 方法抓取網站並印出 text
+            response = rq.get(href, headers=my_header)
+            root = bs(response.text, "html.parser")
+
+            # 抓標題
+            h1_tag = root.find("h1")
+            if h1_tag and h1_tag.string:
+                chapter_title = h1_tag.string.strip()
+                # 将章节标题添加到需要删除的词列表中
+                dynamic_words_to_delete = words_to_delete + [chapter_title,novel_name]
+                print(f"{chapter_title} 下載成功")
+
+                # 抓內容
+                content_divs = root.find_all(
+                    "div",
+                    style="font-size: 20px; line-height: 30px; word-wrap: break-word; table-layout: fixed; word-break: break-all; width: 750px; margin: 0 auto; text-indent: 2em;",
+                )
+
+                for tag in content_divs:
+                    text = tag.get_text()  # 提取標籤中的文本
+
+                    # 刪除匹配 dynamic_words_to_delete 的詞
+                    for word in dynamic_words_to_delete:
+                        text = text.replace(word, "")
+
+                    pattern = re.compile(r"[\d\u4e00-\u9fff…，,。?!、！《》“”？：]+")
+                    matches = pattern.findall(text)
+                    for match in matches:
+                        output_file.write(f"{match}\n")
+                    output_file.write("\n")  # 每章節之間空一行
+
+                sleep(0.2)
+                output_file.write("=" * 30 + "\n")  # 每章小說之間用等號分隔
 
 def close():
     sys.exit()
