@@ -14,7 +14,8 @@ def download():
         "bs4",
         "fake_useragent",
         "lxml",
-        "ffmpeg"
+        "ffmpeg",
+        "asyncio"
         # 添加其他套件的名稱
     ]
 
@@ -39,7 +40,6 @@ def download():
         return
 
 
-download()
 import json
 import os
 import re
@@ -47,7 +47,7 @@ import subprocess
 import sys
 from pprint import pprint
 from time import sleep
-
+import asyncio
 import lxml
 import requests as rq
 from bs4 import BeautifulSoup as bs
@@ -157,49 +157,52 @@ def help():
 
 # nl:小說編號列表
 def nl():
-    # 使用假UA
-    ua = UserAgent()
-    my_header = {"user-agent": ua.random}
-    novel_list_pages = range(1, 1412)
+    novel_list_pages = range(1, 1450)
+    loop = asyncio.get_event_loop()
 
-    # 疊代每個頁面
-    for novel_list_page in novel_list_pages:
-        url = f"https://tw.hjwzw.com/List/all__{novel_list_page}"
+    async def send_req(url):
+        res = await loop.run_in_executor(None, rq.get, url)
+        return res.text
 
-        # get方法 加上 假UA 取得 html
-        ans = rq.get(url, headers=my_header)
+    async def main():
+        tasks = []
+        ua = UserAgent()
+        for page in novel_list_pages:
+            url = f"https://tw.hjwzw.com/List/all__{page}"
+            headers = {"user-agent": ua.random}
+            task = loop.create_task(send_req(url))
+            tasks.append(task)
 
-        # print(ans.encoding)
-        # print(ans.text)
+        results = await asyncio.gather(*tasks)
+        with open("小說編號列表.txt", "w", encoding="utf-8") as output_file:
+            for result in results:
+                root = bs(result, 'lxml')
+                title_spans = root.find_all("span", class_="wd10")
 
-        # 匯入beautiful soup ,使用lxml 編譯器
-        root = bs(ans.text, "lxml")
+                novel_list = []
+                href_list = []
 
-        # 抓標題
-        title = root.find_all("span", class_="wd10")
-        novel_list = []
-        for span in title:
-            a_tag = span.find("a")
-            if a_tag:
-                novel_list.append(a_tag.text)
+                for span in title_spans:
+                    a_tag = span.find("a")
+                    if a_tag:
+                        novel_list.append(a_tag.text)
+                        href_list.append(a_tag["href"])
 
-        # 抓網址
+                href_numbers = [re.search(r"/Book/(\d+)", href).group(1) for href in href_list]
 
-        # 提取<a>標籤中的href屬性
-        href_attributes = [span.find("a")["href"] for span in title if span.find("a")]
-        # 使用正規表達式匹配數字
-        href = [re.search(r"/Book/(\d+)", href).group(1) for href in href_attributes]
-        formatted_data = [
-            f"書籍名稱: {title.ljust(20)}\n書籍編號: {number}\n"
-            for title, number in zip(novel_list, href)
-        ]
+                formatted_data = [
+                    f"書籍名稱: {title.ljust(20)}\n書籍編號: {number}\n"
+                    for title, number in zip(novel_list, href_numbers)
+                ]
 
-        # 印出結果
-        for item in formatted_data:
-            with open("小說編號列表.txt", "a", encoding="utf-8") as output_file:
-                output_file.write(item)
-                output_file.write("\n")
-    print("列表更新完畢")
+                for data in formatted_data:
+                    output_file.write(data)
+                    output_file.write("\n")
+                    print(data)
+                    
+        print("列表更新完畢")
+
+    loop.run_until_complete(main())
 
 
 # 讀取小說資料
@@ -447,6 +450,8 @@ def close():
 
 
 # 主程式
-declare()
-start()
-sutch()
+if __name__ == "__main__":
+    download()
+    declare()
+    start()
+    sutch()
