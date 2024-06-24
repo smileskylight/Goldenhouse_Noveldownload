@@ -15,7 +15,8 @@ def download():
         "fake_useragent",
         "lxml",
         "ffmpeg",
-        "asyncio"
+        "asyncio",
+        "aiohttp"
         # 添加其他套件的名稱
     ]
 
@@ -48,6 +49,7 @@ import sys
 from pprint import pprint
 from time import sleep
 import asyncio
+import aiohttp
 import lxml
 import requests as rq
 from bs4 import BeautifulSoup as bs
@@ -122,10 +124,10 @@ def sutch():
         nd()
         print()
         sutch()
-    elif enter == "ndv":  # 全本下載影片專用
-        nd()
-        print()
-        sutch()
+    # elif enter == "ndv":  # 全本下載影片專用
+    #     nd()
+    #     print()
+    #     sutch()
     elif enter == "nsd":  # 全本下載有聲書
         nsd()
         print()
@@ -147,7 +149,7 @@ def help():
         "ntnu:小說章節連結\n",
         "nva:小說全本觀看\n",
         "nd:全本下載\n",
-        "ndv:全本下載製作有聲書專用\n",
+        "ndv:全本下載製作有聲書專用(與nd工能合併暫不提供服務)\n",
         "nsd:全本下載有聲書(待開發)\n",
         "colse:關閉程式",
     )
@@ -213,7 +215,6 @@ def nl_read():
 
 
 # 查詢小說編號
-import re
 
 
 def nh():
@@ -328,42 +329,34 @@ def nva():
 
 # nd:全本下載
 def nd():
-    words_to_delete = ["請記住本站域名", "黃金屋"]
-    novel_numbers = input(" 請輸入小說編號 : ")
-    # 使用假 ua
-    ua = UserAgent()
-    my_header = {"user-agent": ua.random}
-    url = f"https://tw.hjwzw.com/Book/Chapter/{novel_numbers}"
-    # get方法 加上 假UA 取得 html
-    ans = rq.get(url, headers=my_header)
+    async def fetch(session, url, headers, max_retries=3):
+        for attempt in range(max_retries):
+            try:
+                async with session.get(url, headers=headers) as response:
+                    response.raise_for_status()
+                    return await response.text()
+            except (aiohttp.ClientError, aiohttp.ClientResponseError) as e:
+                if attempt < max_retries - 1:
+                    print(f"下載 {url} 失敗，重試中... ({attempt+1}/{max_retries})")
+                else:
+                    print(f"下載 {url} 失敗，已重試 {max_retries} 次。")
+                    raise e
 
-    root = bs(ans.text, "lxml")
-    # 抓小說名
-    novel_name = root.find("h1").string
+    async def download_chapter(session, href, headers, words_to_delete, novel_name, max_retries=3):
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                html = await fetch(session, href, headers)
+                root = bs(html, "lxml")
 
-    # 抓標題
-    pattern = re.compile(r"/Book/Read/(\d+),(\d+)")
-    title = root.find_all("a", href=pattern)
-    # 抓網址
-    hrefs = ["https://tw.hjwzw.com" + tag["href"] for tag in title]
-
-    # 打開檔案以寫入模式
-    with open(f"{novel_name}.txt", "w", encoding="utf-8") as output_file:
-        for href in hrefs:
-
-            # 使用假 ua 和 get 方法抓取網站並印出 text
-            response = rq.get(href, headers=my_header)
-            root = bs(response.text, "lxml")
-
-            # 抓標題
-            title = root.find("h1").string
-            output_file.write(f"{title}\n")
-            # print(f"{title}下載成功")
-            if title and title.string:
+                # 抓標題
+                title = root.find("h1")
+                if title is None:
+                    raise AttributeError("'NoneType' object has no attribute 'string'")
                 chapter_title = title.string.strip()
-                # 将章节标题添加到需要删除的词列表中
-                dynamic_words_to_delete = words_to_delete + [chapter_title,novel_name]
-                print(f"{chapter_title} 下載成功")
+                
+                success_message = f"{chapter_title} 下載成功"
+                print(success_message)
 
                 # 抓內容
                 content_divs = root.find_all(
@@ -371,79 +364,120 @@ def nd():
                     style="font-size: 20px; line-height: 30px; word-wrap: break-word; table-layout: fixed; word-break: break-all; width: 750px; margin: 0 auto; text-indent: 2em;",
                 )
 
+                chapter_content = []
                 for tag in content_divs:
                     text = tag.get_text()  # 提取標籤中的文本
 
-                    # 刪除匹配 dynamic_words_to_delete 的詞
-                    for word in dynamic_words_to_delete:
+                    for word in words_to_delete + [chapter_title, novel_name]:
                         text = text.replace(word, "")
 
                     pattern = re.compile(r"[\d\u4e00-\u9fff…，,。?!、！《》“”？：]+")
                     matches = pattern.findall(text)
-                    for match in matches:
-                        output_file.write(f"{match}\n")
-                    output_file.write("\n")  # 每章節之間空一行
+                    chapter_content.extend(matches)
+                    chapter_content.append("")  # 每章節之間空一行
 
-                sleep(0.2)
-                output_file.write("=" * 30 + "\n")  # 每章小說之間用等號分隔
+                return chapter_content
 
-# ndv:全本下載做影片用
-def ndv():
-    words_to_delete = ["請記住本站域名", "黃金屋"]
-    novel_numbers = input(" 請輸入小說編號 : ")
-    # 使用假 ua
-    ua = UserAgent()
-    my_header = {"user-agent": ua.random}
-    url = f"https://tw.hjwzw.com/Book/Chapter/{novel_numbers}"
-    # get方法 加上 假UA 取得 html
-    ans = rq.get(url, headers=my_header)
+            except (aiohttp.ClientError, aiohttp.ClientResponseError, AttributeError) as e:
+                retry_count += 1
+                if retry_count < max_retries:
+                    print(f"下載 {href} 失敗，重試中... ({retry_count}/{max_retries})")
+                else:
+                    print(f"下載 {href} 失敗，已重試 {max_retries} 次，將跳過該章節。")
+                    break  # 跳出重試循環，進行下一章節的下載
+        return []
 
-    root = bs(ans.text, "lxml")
-    # 抓小說名
-    novel_name = root.find("h1").string
+    async def download():
+        words_to_delete = ["請記住本站域名", "黃金屋","辰迷書友官方","2579","最穩定，給力文學網","《沸騰文學網》網花","沸騰文學網歡迎您,","為了方便您閱讀，請記住“89文學網”","《沸騰文學網》網7","《沸騰文學網》網","大文學"]
+        novel_numbers = input("請輸入小說編號: ")
 
-    # 抓標題
-    pattern = re.compile(r"/Book/Read/(\d+),(\d+)")
-    title = root.find_all("a", href=pattern)
-    # 抓網址
-    hrefs = ["https://tw.hjwzw.com" + tag["href"] for tag in title]
+        ua = UserAgent()
+        headers = {"user-agent": ua.random}
+        url = f"https://tw.hjwzw.com/Book/Chapter/{novel_numbers}"
 
-    # 打開檔案以寫入模式
-    with open(f"{novel_name}vidio.txt", "w", encoding="utf-8") as output_file:
-        for href in hrefs:
-            # 使用假 ua 和 get 方法抓取網站並印出 text
-            response = rq.get(href, headers=my_header)
-            root = bs(response.text, "html.parser")
+        async with aiohttp.ClientSession() as session:
+            html = await fetch(session, url, headers)
+            root = bs(html, "lxml")
+            novel_name = root.find("h1").string
 
-            # 抓標題
-            h1_tag = root.find("h1")
-            if h1_tag and h1_tag.string:
-                chapter_title = h1_tag.string.strip()
-                # 将章节标题添加到需要删除的词列表中
-                dynamic_words_to_delete = words_to_delete + [chapter_title,novel_name]
-                print(f"{chapter_title} 下載成功")
+            pattern = re.compile(r"/Book/Read/(\d+),(\d+)")
+            title_tags = root.find_all("a", href=pattern)
+            hrefs = ["https://tw.hjwzw.com" + tag["href"] for tag in title_tags]
+            chapter_titles = [tag.get_text(strip=True) for tag in title_tags]
 
-                # 抓內容
-                content_divs = root.find_all(
-                    "div",
-                    style="font-size: 20px; line-height: 30px; word-wrap: break-word; table-layout: fixed; word-break: break-all; width: 750px; margin: 0 auto; text-indent: 2em;",
-                )
+            chapters_content = await asyncio.gather(*[
+                download_chapter(session, href, headers, words_to_delete, novel_name)
+                for href in hrefs
+            ])
 
-                for tag in content_divs:
-                    text = tag.get_text()  # 提取標籤中的文本
+            with open(f"{novel_name}.txt", "w", encoding="utf-8") as output_file:
+                for title, content in zip(chapter_titles, chapters_content):
+                    if content:
+                        output_file.write(f"{title}\n\n")
+                        output_file.write("\n".join(content) + "\n")
+                        output_file.write("=" * 30 + "\n")
 
-                    # 刪除匹配 dynamic_words_to_delete 的詞
-                    for word in dynamic_words_to_delete:
-                        text = text.replace(word, "")
+    if __name__ == "__main__":
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(download())
 
-                    pattern = re.compile(r"[\d\u4e00-\u9fff…，,。?!、！《》“”？：]+")
-                    matches = pattern.findall(text)
-                    for match in matches:
-                        output_file.write(f"{match}\n")
-                    output_file.write("\n")  # 每章節之間空一行
+# # ndv:全本下載做影片用
+# def ndv():
+#     words_to_delete = ["請記住本站域名", "黃金屋"]
+#     novel_numbers = input(" 請輸入小說編號 : ")
+#     # 使用假 ua
+#     ua = UserAgent()
+#     my_header = {"user-agent": ua.random}
+#     url = f"https://tw.hjwzw.com/Book/Chapter/{novel_numbers}"
+#     # get方法 加上 假UA 取得 html
+#     ans = rq.get(url, headers=my_header)
 
-                sleep(0.2)
-                output_file.write("=" * 30 + "\n")  # 每章小說之間用等號分隔
+#     root = bs(ans.text, "lxml")
+#     # 抓小說名
+#     novel_name = root.find("h1").string
+
+#     # 抓標題
+#     pattern = re.compile(r"/Book/Read/(\d+),(\d+)")
+#     title = root.find_all("a", href=pattern)
+#     # 抓網址
+#     hrefs = ["https://tw.hjwzw.com" + tag["href"] for tag in title]
+
+#     # 打開檔案以寫入模式
+#     with open(f"{novel_name}vidio.txt", "w", encoding="utf-8") as output_file:
+#         for href in hrefs:
+#             # 使用假 ua 和 get 方法抓取網站並印出 text
+#             response = rq.get(href, headers=my_header)
+#             root = bs(response.text, "html.parser")
+
+#             # 抓標題
+#             h1_tag = root.find("h1")
+#             if h1_tag and h1_tag.string:
+#                 chapter_title = h1_tag.string.strip()
+#                 # 將章節標題添加到需要删除的詞列表中
+#                 dynamic_words_to_delete = words_to_delete + [chapter_title,novel_name]
+#                 print(f"{chapter_title} 下載成功")
+
+#                 # 抓內容
+#                 content_divs = root.find_all(
+#                     "div",
+#                     style="font-size: 20px; line-height: 30px; word-wrap: break-word; table-layout: fixed; word-break: break-all; width: 750px; margin: 0 auto; text-indent: 2em;",
+#                 )
+
+#                 for tag in content_divs:
+#                     text = tag.get_text()  # 提取標籤中的文本
+
+#                     # 刪除匹配 dynamic_words_to_delete 的詞
+#                     for word in dynamic_words_to_delete:
+#                         text = text.replace(word, "")
+
+#                     pattern = re.compile(r"[\d\u4e00-\u9fff…，,。?!、！《》“”？：]+")
+#                     matches = pattern.findall(text)
+#                     for match in matches:
+#                         output_file.write(f"{match}\n")
+#                     output_file.write("\n")  # 每章節之間空一行
+
+#                 sleep(0.2)
+#                 output_file.write("=" * 30 + "\n")  # 每章小說之間用等號分隔
 
 def close():
     sys.exit()

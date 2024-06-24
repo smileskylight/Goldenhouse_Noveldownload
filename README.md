@@ -18,7 +18,7 @@ git colne https://github.com/smileskylight/Goldenhouse_Nevildownload.git
 ### 使用
 - 本程式暫不提供python argparse 請直接在CMD中執行檔案
 ```bash
-python Novel_goldenhouse_0.4.0.py
+python Novel_goldenhouse_0.4.3.py
 ```
 
 ### 指令
@@ -28,6 +28,6 @@ python Novel_goldenhouse_0.4.0.py
 - ntnu:小說章節連結
 - nva:小說全本觀看
 - nd:全本下載
-- ndv:全本下載製作有聲書專用
+- ndv:全本下載製作有聲書專用(與nd工能合併暫不提供服務)
 - nsd:全本下載有聲書(待開發)
 - colse:關閉程式
