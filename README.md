@@ -22,9 +22,12 @@ python Novel_goldenhouse_1.0.0.py
 ```
 ### 製作有聲書
 - 默認txt小說檔案位置與主程式相同
-- 聲音TTS依附於 https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=zh-TW&q=你輸入什麼'
+- 聲音TTS依附於
+```bash
+   https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=zh-TW&q={你輸入什麼}
+```
 - 聲檔合併依賴 ffmpag ,高階使用可至主程式 Novel_goldenhouse_1.0.0.py 中的 convert_cmd 進行調適
-- ffmpag 詳細指令請參考官方網站 https://ffmpeg.org/
+- ffmpag 詳細指令請參考官方網站 https://ffmpeg.org/ 、https://github.com/FFmpeg/FFmpeg
 ### 指令
 - nl:小說編號列表
 - nh:查詢小說編號
