@@ -10,7 +10,7 @@ https://tw.hjwzw.com/
 ### 下載
 - 請直接在CMD中存放目標位置執行
 ```bash
-git colne https://github.com/smileskylight/Goldenhouse_Nevildownload.git
+git clone https://github.com/smileskylight/Goldenhouse_Nevildownload.git
 ```
 ### 套件
 - 請直接執行主程式,會自動偵測套件安裝情形,如缺少套件會詢問是否安裝補齊套件
